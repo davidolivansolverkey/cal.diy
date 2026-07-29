@@ -4773,5 +4773,6 @@
   "please_reschedule": "Please reschedule.",
   "ADD_NEW_STRINGS_ABOVE_THIS_LINE_TO_PREVENT_MERGE_CONFLICTS": "↑↑↑↑↑↑↑↑↑↑↑↑↑ Add your new strings above here ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑",
   "directory_description": "Organizations, the teams inside them, and the people in each one.",
-  "standalone_teams": "Teams without an organization"
+  "standalone_teams": "Teams without an organization",
+  "assign_to_team_event_types": "Assign to the team's event types"
 }
