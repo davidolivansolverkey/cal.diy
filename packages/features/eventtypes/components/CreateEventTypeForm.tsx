@@ -1,22 +1,27 @@
-import type { ReactNode } from "react";
-import { useState } from "react";
-import type { UseFormReturn } from "react-hook-form";
-
 import { useIsPlatform } from "@calcom/atoms/hooks/useIsPlatform";
+import type { createEventTypeInput } from "@calcom/features/eventtypes/lib/types";
 import { MAX_EVENT_DURATION_MINUTES, MIN_EVENT_DURATION_MINUTES } from "@calcom/lib/constants";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { md } from "@calcom/lib/markdownIt";
 import slugify from "@calcom/lib/slugify";
 import turndown from "@calcom/lib/turndownService";
+import { SchedulingType } from "@calcom/prisma/enums";
+import classNames from "@calcom/ui/classNames";
 import { Editor } from "@calcom/ui/components/editor";
-import { Form } from "@calcom/ui/components/form";
-import { TextAreaField } from "@calcom/ui/components/form";
-import { TextField } from "@calcom/ui/components/form";
+import { Form, TextAreaField, TextField } from "@calcom/ui/components/form";
 import { Tooltip } from "@calcom/ui/components/tooltip";
+import type { ReactNode } from "react";
+import { useState } from "react";
+import type { UseFormReturn } from "react-hook-form";
 import type { z } from "zod";
-import { createEventTypeInput } from "@calcom/features/eventtypes/lib/types";
 
 type CreateEventTypeFormValues = z.infer<typeof createEventTypeInput>;
+
+const SCHEDULING_TYPE_OPTIONS = [
+  { value: SchedulingType.ROUND_ROBIN, labelKey: "round_robin", descriptionKey: "round_robin_description" },
+  { value: SchedulingType.COLLECTIVE, labelKey: "collective", descriptionKey: "collective_description" },
+  { value: SchedulingType.MANAGED, labelKey: "managed_event", descriptionKey: "managed_event_description" },
+] as const;
 
 export default function CreateEventTypeForm({
   form,
@@ -26,6 +31,7 @@ export default function CreateEventTypeForm({
   isPending,
   urlPrefix,
   SubmitButton,
+  teamId,
 }: {
   form: UseFormReturn<CreateEventTypeFormValues>;
   isManagedEventType: boolean;
@@ -34,12 +40,15 @@ export default function CreateEventTypeForm({
   isPending: boolean;
   urlPrefix?: string;
   SubmitButton: (isPending: boolean) => ReactNode;
+  /** Set for team event types, which additionally require a scheduling type. */
+  teamId?: number | null;
 }) {
   const isPlatform = useIsPlatform();
   const { t } = useLocale();
   const [firstRender, setFirstRender] = useState(true);
 
   const { register } = form;
+  const schedulingType = form.watch("schedulingType");
   return (
     <Form
       form={form}
@@ -150,6 +159,34 @@ export default function CreateEventTypeForm({
               addOnSuffix={t("minutes").toLowerCase()}
             />
           </div>
+
+          {teamId ? (
+            <div className="mt-4">
+              <p className="text-emphasis mb-2 text-sm font-medium">{t("scheduling_type")}</p>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {SCHEDULING_TYPE_OPTIONS.map((option) => {
+                  const isSelected = schedulingType === option.value;
+                  return (
+                    <button
+                      type="button"
+                      key={option.value}
+                      aria-pressed={isSelected}
+                      onClick={() => form.setValue("schedulingType", option.value, { shouldValidate: true })}
+                      className={classNames(
+                        "rounded-lg border p-3 text-left",
+                        isSelected ? "border-emphasis bg-subtle" : "border-subtle hover:border-emphasis"
+                      )}>
+                      <span className="text-emphasis block text-sm font-medium">{t(option.labelKey)}</span>
+                      <span className="text-subtle mt-1 block text-xs">{t(option.descriptionKey)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {form.formState.errors.schedulingType && (
+                <p className="text-error mt-2 text-sm">{t("scheduling_type_required_error")}</p>
+              )}
+            </div>
+          ) : null}
         </>
       </div>
       {SubmitButton(isPending)}

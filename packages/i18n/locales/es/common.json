@@ -4638,5 +4638,6 @@
   "ADD_NEW_STRINGS_ABOVE_THIS_LINE_TO_PREVENT_MERGE_CONFLICTS": "↑↑↑↑↑↑↑↑↑↑↑↑↑ Agregue sus nuevas cadenas arriba ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑",
   "directory_description": "Organizaciones, los equipos que contienen y las personas de cada uno.",
   "standalone_teams": "Equipos sin organización",
-  "assign_to_team_event_types": "Asignar a los eventos de equipo"
+  "assign_to_team_event_types": "Asignar a los eventos de equipo",
+  "scheduling_type_required_error": "Debes elegir un tipo de asignación para los eventos de equipo"
 }

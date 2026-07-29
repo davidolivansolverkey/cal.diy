@@ -930,11 +930,35 @@ const CTA = ({ profileOptions }: { profileOptions: ProfileOption[] }) => {
         }}
         placeholder={t("search")}
       />
-      <Button
-        data-testid="new-event-type"
-        href={`?dialog=new&eventPage=${profileOptions[0]?.slug ?? ""}`}>
-        {t("new")}
-      </Button>
+      {profileOptions.length === 1 ? (
+        <Button data-testid="new-event-type" href={`?dialog=new&eventPage=${profileOptions[0]?.slug ?? ""}`}>
+          {t("new")}
+        </Button>
+      ) : (
+        // With teams in play the target profile has to be chosen, because the
+        // dialog needs a teamId to offer the scheduling types.
+        <Dropdown>
+          <DropdownMenuTrigger asChild>
+            <Button data-testid="new-event-type" EndIcon="chevron-down">
+              {t("new")}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {profileOptions
+              .filter((profile) => profile.permissions.canCreateEventType)
+              .map((profile) => (
+                <DropdownMenuItem key={profile.slug ?? "personal"}>
+                  <DropdownItem
+                    href={`?dialog=new&eventPage=${profile.slug ?? ""}${
+                      profile.teamId ? `&teamId=${profile.teamId}` : ""
+                    }`}>
+                    {profile.label ?? profile.slug}
+                  </DropdownItem>
+                </DropdownMenuItem>
+              ))}
+          </DropdownMenuContent>
+        </Dropdown>
+      )}
       <CreateEventTypeDialog profileOptions={profileOptions} />
     </div>
   );
