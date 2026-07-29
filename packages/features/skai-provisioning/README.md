@@ -69,6 +69,38 @@ api-key auth strategy.
 The slug is already provisioned. The body carries the existing `teamId`, so a retried onboarding
 can treat it as success instead of creating a duplicate company.
 
+## Giving members access to Cal.diy
+
+Each provisioned member gets a `passwordSetupUrl` in the response, pointing at Cal.diy's own
+`/auth/forgot-password/:id` flow. SKAI emails it (via Resend); the member sets a password and can
+then log in to manage **their own availability, calendar connections and personal event types** —
+that per-user UI survived the enterprise removal.
+
+The link is valid for 72 hours, longer than Cal.diy's 6-hour self-service reset window because it
+travels through an onboarding email rather than being requested by the user in the moment.
+
+**Members linked from a pre-existing account never get a link.** Issuing one would let a newly
+provisioned company obtain a password reset for a login that already belongs to someone else.
+
+To re-issue a link (expired, or a member provisioned earlier):
+
+```
+POST /api/skai/setup-link
+x-skai-secret: $SKAI_PROVISIONING_SECRET
+
+{ "email": "ana@santos-ochoa.es" }
+```
+
+Returns `201` with `{ email, passwordSetupUrl, expiresAt }`, or `404` if no account exists for that
+email — it never creates a user as a side effect.
+
+### What members cannot do in the UI
+
+The **team** event type will not appear in their event-type list: `getTeamIdsWithPermission` is a
+stub returning `[]`, so team-scoped listings come back empty. The team event type is managed
+programmatically through this slice and the API. What matters for round-robin is each host's own
+availability, and that they can manage.
+
 ## What it writes
 
 One transaction, because a half-provisioned company is unbookable and has to be cleaned up by hand:

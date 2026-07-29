@@ -1,5 +1,6 @@
-import { provisionCompanyInputSchema } from "@calcom/features/skai-provisioning/CompanyProvisioning.types";
+import { issueSetupLinkInputSchema } from "@calcom/features/skai-provisioning/CompanyProvisioning.types";
 import { getCompanyProvisioningService } from "@calcom/features/skai-provisioning/di/CompanyProvisioning.container";
+import { ErrorCode } from "@calcom/lib/errorCodes";
 import { ErrorWithCode } from "@calcom/lib/errors";
 import { defaultResponderForAppDir } from "app/api/defaultResponderForAppDir";
 import { verifySkaiSecret } from "app/api/skai/verifySkaiSecret";
@@ -11,7 +12,7 @@ async function postHandler(request: NextRequest) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
-  const parsed = provisionCompanyInputSchema.safeParse(await request.json());
+  const parsed = issueSetupLinkInputSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json(
       { message: "Invalid request body", issues: parsed.error.issues },
@@ -20,11 +21,11 @@ async function postHandler(request: NextRequest) {
   }
 
   try {
-    const provisioned = await getCompanyProvisioningService().provisionCompany(parsed.data);
-    return NextResponse.json(provisioned, { status: 201 });
+    const setupLink = await getCompanyProvisioningService().issueSetupLink(parsed.data);
+    return NextResponse.json(setupLink, { status: 201 });
   } catch (error) {
-    if (error instanceof ErrorWithCode && error.data?.alreadyProvisioned) {
-      return NextResponse.json({ message: error.message, teamId: error.data.teamId }, { status: 409 });
+    if (error instanceof ErrorWithCode && error.code === ErrorCode.NotFound) {
+      return NextResponse.json({ message: error.message }, { status: 404 });
     }
     throw error;
   }

@@ -38,12 +38,30 @@ export const provisionCompanyInputSchema = z.object({
 export type ProvisionCompanyInput = z.infer<typeof provisionCompanyInputSchema>;
 export type CompanyMemberInput = z.infer<typeof companyMemberInputSchema>;
 
+export const issueSetupLinkInputSchema = z.object({
+  email: z.string().email(),
+});
+
+export type IssueSetupLinkInput = z.infer<typeof issueSetupLinkInputSchema>;
+
+export type SetupLinkDto = {
+  email: string;
+  /** Cal.diy's own /auth/forgot-password/:id flow, where the member sets a password. */
+  passwordSetupUrl: string;
+  expiresAt: string;
+};
+
 export type ProvisionedMemberDto = {
   userId: number;
   email: string;
   username: string;
   /** True when the email already existed and the user was linked instead of created. */
   linkedExistingUser: boolean;
+  /**
+   * Absent for linked accounts: they already have credentials, so handing out a
+   * password-setup link for them would let a new company reset an existing login.
+   */
+  passwordSetupUrl?: string;
 };
 
 export type ProvisionedCompanyDto = {

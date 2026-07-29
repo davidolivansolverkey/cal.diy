@@ -2,14 +2,21 @@ import process from "node:process";
 import { generateUniqueAPIKey } from "@calcom/features/api-keys-legacy/api-keys/lib/apiKeys";
 import { ErrorWithCode } from "@calcom/lib/errors";
 import type {
+  IssueSetupLinkInput,
   ProvisionCompanyInput,
   ProvisionedCompanyDto,
   ResolvedMemberToProvision,
+  SetupLinkDto,
 } from "../CompanyProvisioning.types";
 import type { CompanyProvisioningRepository } from "../repositories/CompanyProvisioningRepository";
 
 const DEFAULT_HOST_PRIORITY = 2;
 const DEFAULT_HOST_WEIGHT = 100;
+/**
+ * Longer than Cal.diy's 6-hour reset window because this is an onboarding link that
+ * travels through SKAI's own email, not a self-service reset the user just asked for.
+ */
+const SETUP_LINK_EXPIRY_HOURS = 72;
 
 export interface ICompanyProvisioningServiceDeps {
   companyProvisioningRepo: CompanyProvisioningRepository;
@@ -38,6 +45,7 @@ export class CompanyProvisioningService {
 
     const members = await this.resolveMembers(input, existingUserByEmail);
     const [apiKeyHash, apiKey] = generateUniqueAPIKey();
+    const setupLinkExpiresAt = expiryFromNow(SETUP_LINK_EXPIRY_HOURS);
 
     const created = await this.deps.companyProvisioningRepo.createCompany({
       team: {
@@ -54,6 +62,7 @@ export class CompanyProvisioningService {
         schedulingType: input.eventType.schedulingType,
       },
       apiKeyHash,
+      setupLinkExpiresAt,
     });
 
     const apiKeyPrefix = process.env.API_KEY_PREFIX ?? "cal_";
@@ -64,7 +73,32 @@ export class CompanyProvisioningService {
       eventTypeId: created.eventTypeId,
       eventTypeSlug: input.eventType.slug,
       apiKey: `${apiKeyPrefix}${apiKey}`,
-      members: created.members,
+      members: created.members.map(({ passwordResetRequestId, ...member }) => ({
+        ...member,
+        passwordSetupUrl: passwordResetRequestId ? buildPasswordSetupUrl(passwordResetRequestId) : undefined,
+      })),
+    };
+  }
+
+  /**
+   * Re-issues a setup link for a member who was provisioned earlier, whose link
+   * expired, or who needs to regain access without an SMTP server configured.
+   */
+  async issueSetupLink(input: IssueSetupLinkInput): Promise<SetupLinkDto> {
+    const email = input.email.toLowerCase();
+    const [user] = await this.deps.companyProvisioningRepo.findUserIdsByEmails([email]);
+
+    if (!user) {
+      throw ErrorWithCode.Factory.NotFound(`No Cal.diy account exists for ${email}`);
+    }
+
+    const expiresAt = expiryFromNow(SETUP_LINK_EXPIRY_HOURS);
+    const requestId = await this.deps.companyProvisioningRepo.createPasswordResetRequest(email, expiresAt);
+
+    return {
+      email,
+      passwordSetupUrl: buildPasswordSetupUrl(requestId),
+      expiresAt: expiresAt.toISOString(),
     };
   }
 
@@ -84,7 +118,8 @@ export class CompanyProvisioningService {
       return {
         existingUserId: existingUser?.id,
         name: member.name,
-        email: member.email,
+        // Stored lowercase so later lookups by email, including setup-link re-issues, match.
+        email: member.email.toLowerCase(),
         username,
         timeZone: member.timeZone ?? input.company.timeZone,
         priority: member.priority ?? DEFAULT_HOST_PRIORITY,
@@ -92,6 +127,21 @@ export class CompanyProvisioningService {
       };
     });
   }
+}
+
+function expiryFromNow(hours: number): Date {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
+}
+
+export function buildPasswordSetupUrl(resetRequestId: string): string {
+  const baseUrl = process.env.NEXT_PUBLIC_WEBAPP_URL;
+  if (!baseUrl) {
+    throw ErrorWithCode.Factory.BadRequest(
+      "NEXT_PUBLIC_WEBAPP_URL must be set to hand out password setup links"
+    );
+  }
+
+  return `${baseUrl.replace(/\/+$/, "")}/auth/forgot-password/${resetRequestId}`;
 }
 
 export function buildUsernameCandidate(companySlug: string, email: string): string {

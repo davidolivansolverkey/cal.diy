@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProvisionCompanyInput } from "../CompanyProvisioning.types";
 import type { CompanyProvisioningRepository } from "../repositories/CompanyProvisioningRepository";
 import {
+  buildPasswordSetupUrl,
   buildUsernameCandidate,
   CompanyProvisioningService,
   claimUsername,
@@ -35,16 +36,20 @@ function buildRepo(overrides: Partial<CompanyProvisioningRepository> = {}) {
     findTeamIdBySlug: vi.fn().mockResolvedValue(null),
     findUserIdsByEmails: vi.fn().mockResolvedValue([]),
     findTakenUsernames: vi.fn().mockResolvedValue([]),
+    createPasswordResetRequest: vi.fn().mockResolvedValue("reset-request-id"),
     createCompany: vi.fn().mockImplementation(({ members }) =>
       Promise.resolve({
         teamId: 10,
         eventTypeId: 20,
-        members: members.map((member: { email: string; username: string }, index: number) => ({
-          userId: 100 + index,
-          email: member.email,
-          username: member.username,
-          linkedExistingUser: false,
-        })),
+        members: members.map(
+          (member: { email: string; username: string; existingUserId?: number }, index: number) => ({
+            userId: member.existingUserId ?? 100 + index,
+            email: member.email,
+            username: member.username,
+            linkedExistingUser: member.existingUserId !== undefined,
+            passwordResetRequestId: member.existingUserId === undefined ? `reset-${index}` : undefined,
+          })
+        ),
       })
     ),
     ...overrides,
@@ -55,6 +60,7 @@ function buildRepo(overrides: Partial<CompanyProvisioningRepository> = {}) {
 describe("CompanyProvisioningService", () => {
   beforeEach(() => {
     delete process.env.API_KEY_PREFIX;
+    process.env.NEXT_PUBLIC_WEBAPP_URL = "https://cal.example.com";
   });
 
   it("provisions a company and returns the prefixed api key", async () => {
@@ -151,6 +157,50 @@ describe("CompanyProvisioningService", () => {
     expect(members[1].timeZone).toBe("Atlantic/Canary");
   });
 
+  it("returns a password setup link for newly created members", async () => {
+    const service = new CompanyProvisioningService({ companyProvisioningRepo: buildRepo() });
+
+    const result = await service.provisionCompany(buildInput());
+
+    expect(result.members[0].passwordSetupUrl).toBe("https://cal.example.com/auth/forgot-password/reset-0");
+    expect(result.members[1].passwordSetupUrl).toBe("https://cal.example.com/auth/forgot-password/reset-1");
+  });
+
+  it("omits the setup link for a linked pre-existing account", async () => {
+    const repo = buildRepo({
+      findUserIdsByEmails: vi
+        .fn()
+        .mockResolvedValue([{ id: 42, email: "ana@santos-ochoa.es", username: "ana-existing" }]),
+    });
+    const service = new CompanyProvisioningService({ companyProvisioningRepo: repo });
+
+    const result = await service.provisionCompany(buildInput());
+
+    expect(result.members[0].linkedExistingUser).toBe(true);
+    expect(result.members[0].passwordSetupUrl).toBeUndefined();
+    expect(result.members[1].passwordSetupUrl).toBeDefined();
+  });
+
+  it("lowercases stored emails so later lookups match", async () => {
+    const repo = buildRepo();
+    const service = new CompanyProvisioningService({ companyProvisioningRepo: repo });
+    const input = buildInput({ members: [{ name: "Ana", email: "Ana.Ruiz@Santos-Ochoa.ES" }] });
+
+    await service.provisionCompany(input);
+
+    expect(repo.createCompany.mock.calls[0][0].members[0].email).toBe("ana.ruiz@santos-ochoa.es");
+  });
+
+  it("passes a future setup link expiry to the repository", async () => {
+    const repo = buildRepo();
+    const service = new CompanyProvisioningService({ companyProvisioningRepo: repo });
+
+    await service.provisionCompany(buildInput());
+
+    const expiresAt: Date = repo.createCompany.mock.calls[0][0].setupLinkExpiresAt;
+    expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
   it("passes the SKAI tenant id through for reconciliation", async () => {
     const repo = buildRepo();
     const service = new CompanyProvisioningService({ companyProvisioningRepo: repo });
@@ -158,6 +208,55 @@ describe("CompanyProvisioningService", () => {
     await service.provisionCompany(buildInput());
 
     expect(repo.createCompany.mock.calls[0][0].team.skaiTenantId).toBe("tenant-uuid");
+  });
+});
+
+describe("issueSetupLink", () => {
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_WEBAPP_URL = "https://cal.example.com";
+  });
+
+  it("re-issues a link for an existing account", async () => {
+    const repo = buildRepo({
+      findUserIdsByEmails: vi
+        .fn()
+        .mockResolvedValue([{ id: 42, email: "ana@santos-ochoa.es", username: "ana" }]),
+    });
+    const service = new CompanyProvisioningService({ companyProvisioningRepo: repo });
+
+    const result = await service.issueSetupLink({ email: "Ana@Santos-Ochoa.es" });
+
+    expect(result.email).toBe("ana@santos-ochoa.es");
+    expect(result.passwordSetupUrl).toBe("https://cal.example.com/auth/forgot-password/reset-request-id");
+    expect(new Date(result.expiresAt).getTime()).toBeGreaterThan(Date.now());
+    expect(repo.createPasswordResetRequest).toHaveBeenCalledWith("ana@santos-ochoa.es", expect.any(Date));
+  });
+
+  it("rejects an email with no account rather than creating one", async () => {
+    const repo = buildRepo();
+    const service = new CompanyProvisioningService({ companyProvisioningRepo: repo });
+
+    await expect(service.issueSetupLink({ email: "nobody@example.com" })).rejects.toThrow(
+      /No Cal.diy account exists/
+    );
+    expect(repo.createPasswordResetRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildPasswordSetupUrl", () => {
+  it("builds the forgot-password url", () => {
+    process.env.NEXT_PUBLIC_WEBAPP_URL = "https://cal.example.com";
+    expect(buildPasswordSetupUrl("abc")).toBe("https://cal.example.com/auth/forgot-password/abc");
+  });
+
+  it("tolerates a trailing slash on the base url", () => {
+    process.env.NEXT_PUBLIC_WEBAPP_URL = "https://cal.example.com/";
+    expect(buildPasswordSetupUrl("abc")).toBe("https://cal.example.com/auth/forgot-password/abc");
+  });
+
+  it("fails loudly when the base url is unset", () => {
+    delete process.env.NEXT_PUBLIC_WEBAPP_URL;
+    expect(() => buildPasswordSetupUrl("abc")).toThrow(/NEXT_PUBLIC_WEBAPP_URL/);
   });
 });
 

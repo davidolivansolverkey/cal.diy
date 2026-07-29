@@ -13,12 +13,19 @@ type CreateCompanyArgs = {
     schedulingType: Extract<SchedulingType, "ROUND_ROBIN" | "COLLECTIVE">;
   };
   apiKeyHash: string;
+  setupLinkExpiresAt: Date;
 };
 
 type CreateCompanyResult = {
   teamId: number;
   eventTypeId: number;
-  members: { userId: number; email: string; username: string; linkedExistingUser: boolean }[];
+  members: {
+    userId: number;
+    email: string;
+    username: string;
+    linkedExistingUser: boolean;
+    passwordResetRequestId?: string;
+  }[];
 };
 
 export class CompanyProvisioningRepository {
@@ -54,8 +61,26 @@ export class CompanyProvisioningRepository {
    * no hosts, or an event type with no API key) is unbookable and has to be cleaned
    * up by hand. SKAI retries provisioning, so partial state must never survive.
    */
+  /**
+   * Invalidates any live request for this email first, matching what Cal.diy's own
+   * forgot-password flow does, so an older link cannot be replayed.
+   */
+  async createPasswordResetRequest(email: string, expiresAt: Date): Promise<string> {
+    await this.prismaClient.resetPasswordRequest.updateMany({
+      where: { email, expires: { gt: new Date() } },
+      data: { expires: new Date() },
+    });
+
+    const created = await this.prismaClient.resetPasswordRequest.create({
+      data: { email, expires: expiresAt },
+      select: { id: true },
+    });
+
+    return created.id;
+  }
+
   async createCompany(args: CreateCompanyArgs): Promise<CreateCompanyResult> {
-    const { team, members, eventType, apiKeyHash } = args;
+    const { team, members, eventType, apiKeyHash, setupLinkExpiresAt } = args;
 
     return this.prismaClient.$transaction(async (tx) => {
       const createdTeam = await tx.team.create({
@@ -74,6 +99,7 @@ export class CompanyProvisioningRepository {
         const member = members[index];
         let userId = member.existingUserId;
         let username = member.username;
+        let passwordResetRequestId: string | undefined;
 
         if (userId === undefined) {
           const createdUser = await tx.user.create({
@@ -112,6 +138,14 @@ export class CompanyProvisioningRepository {
             where: { id: userId },
             data: { defaultScheduleId: createdSchedule.id },
           });
+
+          // Only for accounts we just created. Issuing one for a linked account would
+          // let a newly provisioned company reset a login that already belongs to someone.
+          const createdReset = await tx.resetPasswordRequest.create({
+            data: { email: member.email, expires: setupLinkExpiresAt },
+            select: { id: true },
+          });
+          passwordResetRequestId = createdReset.id;
         } else {
           const existing = await tx.user.findUniqueOrThrow({
             where: { id: userId },
@@ -136,6 +170,7 @@ export class CompanyProvisioningRepository {
           email: member.email,
           username,
           linkedExistingUser: member.existingUserId !== undefined,
+          passwordResetRequestId,
         });
       }
 
