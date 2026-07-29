@@ -213,6 +213,11 @@ const getTabs = (
           trackingMetadata: { section: "admin", page: "users" },
         },
         {
+          name: "organizations",
+          href: "/settings/admin/organizations",
+          trackingMetadata: { section: "admin", page: "organizations" },
+        },
+        {
           name: "lockedSMS",
           href: "/settings/admin/lockedSMS",
           trackingMetadata: { section: "admin", page: "locked_sms" },
