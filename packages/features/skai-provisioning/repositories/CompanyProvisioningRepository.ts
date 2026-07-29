@@ -48,9 +48,15 @@ export class CompanyProvisioningRepository {
     });
   }
 
-  async findTakenUsernames(usernames: string[]): Promise<string[]> {
+  /**
+   * Prefix match, not exact: the caller resolves collisions by appending -2, -3, so it
+   * needs to know about those variants too or the insert hits the unique constraint.
+   */
+  async findTakenUsernames(candidates: string[]): Promise<string[]> {
+    if (candidates.length === 0) return [];
+
     const users = await this.prismaClient.user.findMany({
-      where: { username: { in: usernames } },
+      where: { OR: candidates.map((candidate) => ({ username: { startsWith: candidate } })) },
       select: { username: true },
     });
     return users.flatMap((user) => (user.username ? [user.username] : []));
