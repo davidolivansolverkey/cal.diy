@@ -4642,5 +4642,7 @@
   "scheduling_type_required_error": "Debes elegir un tipo de asignación para los eventos de equipo",
   "existing_person": "Persona existente",
   "or_create_new_person": "…o crear una nueva",
-  "choose": "Elegir"
+  "choose": "Elegir",
+  "fixed_host": "Host fijo",
+  "priority": "Prioridad"
 }

@@ -4778,5 +4778,7 @@
   "scheduling_type_required_error": "You must select a scheduling type for team events",
   "existing_person": "Existing person",
   "or_create_new_person": "…or create a new one",
-  "choose": "Choose"
+  "choose": "Choose",
+  "fixed_host": "Fixed host",
+  "priority": "Priority"
 }

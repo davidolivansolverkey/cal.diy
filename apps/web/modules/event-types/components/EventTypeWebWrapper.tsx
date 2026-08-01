@@ -45,7 +45,9 @@ const EventAvailabilityTab = dynamic(() =>
   import("./tabs/availability/EventAvailabilityTabWebWrapper").then((mod) => mod)
 );
 
-const EventTeamAssignmentTab = dynamic(() => Promise.resolve((_props: Record<string, unknown>) => null));
+const EventTeamAssignmentTab = dynamic(() =>
+  import("./tabs/team/EventTeamAssignmentTab").then((mod) => mod.EventTeamAssignmentTab)
+);
 
 const EventLimitsTab = dynamic(() => import("./tabs/limits/EventLimitsTabWebWrapper").then((mod) => mod));
 
@@ -60,7 +62,6 @@ const EventAppsTab = dynamic(() => import("./tabs/apps/EventAppsTab").then((mod)
 const EventWebhooksTab = dynamic(() =>
   import("./tabs/webhooks/EventWebhooksTab").then((mod) => mod.EventWebhooksTab)
 );
-
 
 export type EventTypeWebWrapperProps = {
   id: number;
@@ -278,16 +279,7 @@ const EventTypeWeb = ({
 
   const querySchema = z.object({
     tabName: z
-      .enum([
-        "setup",
-        "availability",
-        "team",
-        "limits",
-        "advanced",
-        "recurring",
-        "apps",
-        "webhooks",
-      ])
+      .enum(["setup", "availability", "team", "limits", "advanced", "recurring", "apps", "webhooks"])
       .optional()
       .default("setup"),
   });
