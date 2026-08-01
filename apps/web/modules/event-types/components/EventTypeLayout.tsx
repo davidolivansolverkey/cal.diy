@@ -79,11 +79,18 @@ function EventTypeSingleLayout({
 
   const isManagedEventType = false;
   const isChildrenManagedEventType = false;
-  const shouldLockDisableProps = (_field: string) => ({ disabled: false, LockedIcon: false as const, isLocked: false });
+  const shouldLockDisableProps = (_field: string) => ({
+    disabled: false,
+    LockedIcon: false as const,
+    isLocked: false,
+  });
   const shouldLockIndicator = (_field: string) => false;
   const EventTypeTabs = tabsNavigation;
+  // Always prefixed with team/, including sub-teams. Upstream drops the prefix for
+  // a sub-team because it is served from its organization's subdomain, which this
+  // build does not serve — so the shortened link pointed at a 404. Matches embedLink.
   const permalink = `${bookerUrl}/${
-    team ? `${!team.parentId ? "team/" : ""}${team.slug}` : formMethods.getValues("users")[0].username
+    team ? `team/${team.slug}` : formMethods.getValues("users")[0].username
   }/${eventType.slug}`;
 
   const embedLink = `${

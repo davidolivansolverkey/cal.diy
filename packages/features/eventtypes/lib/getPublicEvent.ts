@@ -402,7 +402,10 @@ export const getPublicEvent = async (
     ? {
         team: {
           ...getSlugOrRequestedSlug(username),
-          parent: orgQuery,
+          // Only scope by parent when an organization domain resolved. This build
+          // does not serve org subdomains, so requiring parent: null would make
+          // every sub-team unbookable rather than merely unscoped.
+          ...(orgQuery ? { parent: orgQuery } : {}),
         },
       }
     : {

@@ -103,8 +103,11 @@ const TeamListItem = ({ team }: { team: Team }) => {
       </Link>
 
       <div className="flex shrink-0 items-center gap-2">
+        {team.isOrganization && <Badge variant="orange">{t("organization")}</Badge>}
         <Badge variant="gray">{t(roleLabelKey[team.role])}</Badge>
-        {team.slug && (
+        {/* An organization holds no event types of its own — it groups teams — so
+            offering it a booking preview would only ever lead to a dead page. */}
+        {team.slug && !team.isOrganization && (
           <Button color="secondary" href={`/team/${team.slug}`} target="_blank" EndIcon="external-link">
             {t("preview")}
           </Button>
