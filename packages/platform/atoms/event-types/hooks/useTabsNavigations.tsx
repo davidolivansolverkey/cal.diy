@@ -21,12 +21,7 @@ type Props = {
   team: EventTypeSetupProps["team"];
   eventTypeApps?: EventTypeApps;
 };
-export const useTabsNavigations = ({
-  formMethods,
-  eventType,
-  team,
-  eventTypeApps,
-}: Props) => {
+export const useTabsNavigations = ({ formMethods, eventType, team, eventTypeApps }: Props) => {
   const { t } = useLocale();
 
   const length = formMethods.watch("length");
@@ -112,18 +107,10 @@ export const useTabsNavigations = ({
         "data-testid": "assignment",
       });
     }
-    const showInstant = !(isManagedEventType || isChildrenManagedEventType);
-    if (showInstant) {
-      if (team) {
-        navigation.push({
-          name: t("instant_tab_title"),
-          href: `/event-types/${eventType.id}?tabName=instant`,
-          icon: "phone-call",
-          info: t(`instant_event_tab_description`),
-          "data-testid": "instant_tab_title",
-        });
-      }
-    }
+    // The instant meeting tab is not offered: the feature went with the enterprise
+    // code, and its ?tabName=instant is not in the page's tabName enum, so clicking
+    // it failed validation and left the panel blank. Only team events reached it,
+    // which is why it stayed hidden until team events worked again.
     navigation.push({
       name: t("webhooks"),
       href: `/event-types/${eventTypeId}?tabName=webhooks`,
