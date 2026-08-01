@@ -15,7 +15,7 @@ import type { GetServerSidePropsContext } from "next";
 import type { Session } from "next-auth";
 import { z } from "zod";
 
-type Props = {
+export type Props = {
   eventData: NonNullable<Awaited<ReturnType<typeof getPublicEvent>>>;
   booking?: GetBookingType;
   rescheduleUid: string | null;
@@ -28,7 +28,7 @@ type Props = {
   orgBannerUrl: null;
 };
 
-async function processReschedule({
+export async function processReschedule({
   props,
   rescheduleUid,
   session,
@@ -87,7 +87,7 @@ async function processReschedule({
   };
 }
 
-async function processSeatedEvent({
+export async function processSeatedEvent({
   props,
   bookingUid,
   allowRescheduleForCancelledBooking,
