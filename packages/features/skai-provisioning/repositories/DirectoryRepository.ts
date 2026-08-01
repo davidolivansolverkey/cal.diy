@@ -107,6 +107,17 @@ export class DirectoryRepository {
     return users.flatMap((user) => (user.username ? [user.username] : []));
   }
 
+  /** Feeds the "existing person" picker, so it is capped rather than unbounded. */
+  async findUsers(
+    take: number
+  ): Promise<{ id: number; name: string | null; email: string; username: string | null }[]> {
+    return this.prismaClient.user.findMany({
+      select: { id: true, name: true, email: true, username: true },
+      orderBy: { email: "asc" },
+      take,
+    });
+  }
+
   async findMembership(teamId: number, userId: number): Promise<{ id: number } | null> {
     return this.prismaClient.membership.findUnique({
       where: { userId_teamId: { userId, teamId } },

@@ -1,7 +1,9 @@
 import { getServerSession } from "@calcom/features/auth/lib/getServerSession";
 import SettingsHeader from "@calcom/features/settings/appDir/SettingsHeader";
+import type { TeamNodeDto } from "@calcom/features/skai-provisioning/Directory.types";
 import { getDirectoryService } from "@calcom/features/skai-provisioning/di/Directory.container";
 import { UserPermissionRole } from "@calcom/prisma/enums";
+import type { MemberTarget } from "@calcom/web/modules/skai-directory/views/directory-forms";
 import { DirectoryForms } from "@calcom/web/modules/skai-directory/views/directory-forms";
 import { DirectoryListingView } from "@calcom/web/modules/skai-directory/views/directory-listing-view";
 import { buildLegacyRequest } from "@lib/buildLegacyCtx";
@@ -19,6 +21,12 @@ export const generateMetadata = async () =>
     "/settings/admin/organizations"
   );
 
+/** A team without a slug cannot be addressed by the API, so it is not offered. */
+const flattenTargets = (node: TeamNodeDto): MemberTarget[] => [
+  ...(node.slug ? [{ slug: node.slug, label: node.name, isOrganization: node.isOrganization }] : []),
+  ...node.teams.flatMap(flattenTargets),
+];
+
 const Page = async () => {
   // Checked here and not only in (admin-layout): layouts do not intercept every
   // request, and this page reads every member's email across every tenant.
@@ -30,7 +38,13 @@ const Page = async () => {
   }
 
   const t = await getTranslate();
-  const directory = await getDirectoryService().getDirectory();
+  const directoryService = getDirectoryService();
+  const [directory, people] = await Promise.all([
+    directoryService.getDirectory(),
+    directoryService.listUsers(),
+  ]);
+
+  const targets = [...directory.organizations, ...directory.standaloneTeams].flatMap(flattenTargets);
 
   return (
     <SettingsHeader title={t("organizations")} description={t("directory_description")}>
@@ -54,7 +68,15 @@ const Page = async () => {
           add: t("add"),
           optional: t("optional"),
           assignToEventTypes: t("assign_to_team_event_types"),
+          existingPerson: t("existing_person"),
+          orCreateNewPerson: t("or_create_new_person"),
+          choose: t("choose"),
         }}
+        targets={targets}
+        people={people.map((person) => ({
+          email: person.email,
+          label: person.name ? `${person.name} — ${person.email}` : person.email,
+        }))}
       />
       <DirectoryListingView
         directory={directory}

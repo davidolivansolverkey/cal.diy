@@ -4639,5 +4639,8 @@
   "directory_description": "Organizaciones, los equipos que contienen y las personas de cada uno.",
   "standalone_teams": "Equipos sin organización",
   "assign_to_team_event_types": "Asignar a los eventos de equipo",
-  "scheduling_type_required_error": "Debes elegir un tipo de asignación para los eventos de equipo"
+  "scheduling_type_required_error": "Debes elegir un tipo de asignación para los eventos de equipo",
+  "existing_person": "Persona existente",
+  "or_create_new_person": "…o crear una nueva",
+  "choose": "Elegir"
 }

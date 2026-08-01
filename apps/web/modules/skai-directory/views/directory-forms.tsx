@@ -20,7 +20,13 @@ export type DirectoryFormLabels = {
   add: string;
   optional: string;
   assignToEventTypes: string;
+  existingPerson: string;
+  orCreateNewPerson: string;
+  choose: string;
 };
+
+export type MemberTarget = { slug: string; label: string; isOrganization: boolean };
+export type ExistingPerson = { email: string; label: string };
 
 const inputClassName =
   "border-default bg-default text-emphasis placeholder:text-muted w-full rounded-md border px-3 py-2 text-sm";
@@ -93,6 +99,8 @@ const FormCard = ({
 export const DirectoryForms = ({
   actions,
   labels,
+  targets,
+  people,
 }: {
   actions: {
     createOrganization: FormAction;
@@ -100,6 +108,8 @@ export const DirectoryForms = ({
     addMember: FormAction;
   };
   labels: DirectoryFormLabels;
+  targets: MemberTarget[];
+  people: ExistingPerson[];
 }) => (
   <div className="mb-8 grid gap-4 md:grid-cols-3">
     <FormCard
@@ -113,18 +123,55 @@ export const DirectoryForms = ({
     <FormCard title={labels.createTeam} action={actions.createTeam} submitLabel={labels.submit}>
       <Field label={labels.name} name="name" placeholder="Ventas" />
       <Field label={labels.slug} name="slug" placeholder="ventas" />
-      <Field
-        label={`${labels.organization} (${labels.optional})`}
-        name="organizationSlug"
-        placeholder="solverkey"
-        required={false}
-      />
+      <label className="flex flex-col gap-1">
+        <span className="text-emphasis text-sm font-medium">
+          {labels.organization} ({labels.optional})
+        </span>
+        <select className={inputClassName} name="organizationSlug" defaultValue="">
+          <option value="">{labels.choose}</option>
+          {targets
+            .filter((target) => target.isOrganization)
+            .map((target) => (
+              <option key={target.slug} value={target.slug}>
+                {target.label}
+              </option>
+            ))}
+        </select>
+      </label>
     </FormCard>
 
     <FormCard title={labels.addMember} action={actions.addMember} submitLabel={labels.add}>
-      <Field label={labels.team} name="teamSlug" placeholder="ventas" />
-      <Field label={labels.name} name="name" placeholder="Ana Ruiz" />
-      <Field label={labels.email} name="email" type="email" placeholder="ana@empresa.es" />
+      <label className="flex flex-col gap-1">
+        <span className="text-emphasis text-sm font-medium">
+          {labels.organization} / {labels.team}
+        </span>
+        <select className={inputClassName} name="teamSlug" required defaultValue="">
+          <option value="" disabled>
+            {labels.choose}
+          </option>
+          {targets.map((target) => (
+            <option key={target.slug} value={target.slug}>
+              {target.isOrganization ? `${target.label} (${labels.organization})` : target.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
+        <span className="text-emphasis text-sm font-medium">{labels.existingPerson}</span>
+        <select className={inputClassName} name="existingEmail" defaultValue="">
+          <option value="">{labels.choose}</option>
+          {people.map((person) => (
+            <option key={person.email} value={person.email}>
+              {person.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <p className="text-subtle text-xs">{labels.orCreateNewPerson}</p>
+      <Field label={labels.name} name="name" placeholder="Ana Ruiz" required={false} />
+      <Field label={labels.email} name="email" type="email" placeholder="ana@empresa.es" required={false} />
       <label className="flex flex-col gap-1">
         <span className="text-emphasis text-sm font-medium">{labels.role}</span>
         <select className={inputClassName} name="role" defaultValue="MEMBER">

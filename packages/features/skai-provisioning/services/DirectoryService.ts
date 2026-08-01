@@ -4,6 +4,7 @@ import type {
   CreateOrganizationInput,
   CreateTeamInput,
   DirectoryDto,
+  DirectoryUserDto,
   RemoveMemberInput,
   TeamNodeDto,
   UpdateMemberRoleInput,
@@ -79,12 +80,18 @@ export class DirectoryService {
       }
     }
 
+    if (!existingUser && !input.name) {
+      throw ErrorWithCode.Factory.BadRequest(
+        `${email} has no account yet, so a name is required to create one`
+      );
+    }
+
     const username = existingUser?.username ?? (await this.claimFreeUsername(input.teamSlug, email));
 
     const result = await this.deps.directoryRepo.addMember({
       teamId: team.id,
       existingUserId: existingUser?.id,
-      name: input.name,
+      name: input.name ?? email,
       email,
       username,
       timeZone: input.timeZone ?? DEFAULT_TIME_ZONE,
@@ -112,6 +119,10 @@ export class DirectoryService {
     const { team, userId } = await this.requireMembership(input.teamSlug, input.email);
     const { removedHostCount } = await this.deps.directoryRepo.removeMember(team.id, userId);
     return { userId, removedHostCount };
+  }
+
+  async listUsers(take = 500): Promise<DirectoryUserDto[]> {
+    return this.deps.directoryRepo.findUsers(take);
   }
 
   async getDirectory(): Promise<DirectoryDto> {

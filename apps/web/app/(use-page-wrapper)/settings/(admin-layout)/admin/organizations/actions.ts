@@ -73,8 +73,10 @@ export async function addMemberAction(formData: FormData): Promise<ActionResult>
   return run(async () => {
     const input = addMemberInputSchema.parse({
       teamSlug: formData.get("teamSlug"),
-      name: formData.get("name"),
-      email: formData.get("email"),
+      name: optional(formData.get("name")),
+      // The picker wins over the free-text field, so choosing an existing person
+      // never creates a second account from a typo in the email box.
+      email: optional(formData.get("existingEmail")) ?? optional(formData.get("email")),
       role: optional(formData.get("role")) ?? "MEMBER",
       assignToEventTypes: formData.get("assignToEventTypes") === "on",
     });

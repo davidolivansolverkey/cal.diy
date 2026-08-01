@@ -164,6 +164,40 @@ describe("addMember", () => {
     expect(repo.addMember).not.toHaveBeenCalled();
   });
 
+  it("adds an existing person without needing their name again", async () => {
+    const repo = buildRepo({
+      findTeamBySlug: vi.fn().mockResolvedValue({ id: 7, isOrganization: true }),
+      findUserByEmail: vi.fn().mockResolvedValue({ id: 42, username: "ana" }),
+    });
+    const service = new DirectoryService({ directoryRepo: repo });
+
+    await service.addMember({
+      teamSlug: "solverkey",
+      email: "ana@santos-ochoa.es",
+      role: "MEMBER",
+      assignToEventTypes: true,
+    });
+
+    expect(repo.addMember).toHaveBeenCalledWith(expect.objectContaining({ existingUserId: 42 }));
+  });
+
+  it("demands a name when the account has to be created", async () => {
+    const repo = buildRepo({
+      findTeamBySlug: vi.fn().mockResolvedValue({ id: 7, isOrganization: false }),
+    });
+    const service = new DirectoryService({ directoryRepo: repo });
+
+    await expect(
+      service.addMember({
+        teamSlug: "ventas",
+        email: "nuevo@empresa.es",
+        role: "MEMBER",
+        assignToEventTypes: true,
+      })
+    ).rejects.toThrow(/a name is required/);
+    expect(repo.addMember).not.toHaveBeenCalled();
+  });
+
   it("sidesteps username collisions including suffixed variants", async () => {
     const repo = buildRepo({
       findTeamBySlug: vi.fn().mockResolvedValue({ id: 7, isOrganization: false }),

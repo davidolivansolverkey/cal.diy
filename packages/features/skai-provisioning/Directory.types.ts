@@ -31,8 +31,10 @@ export const createTeamInputSchema = z.object({
 });
 
 export const addMemberInputSchema = z.object({
+  /** Slug of an organization or a team — an organization is a Team row too. */
   teamSlug: slugSchema,
-  name: z.string().min(1).max(255),
+  /** Only required when the email is unknown and the account has to be created. */
+  name: z.string().min(1).max(255).optional(),
   email: z.string().email(),
   role: membershipRoleSchema.default("MEMBER"),
   timeZone: z.string().min(1).optional(),
@@ -73,6 +75,13 @@ export type TeamNodeDto = {
     accepted: boolean;
   }[];
   teams: TeamNodeDto[];
+};
+
+export type DirectoryUserDto = {
+  id: number;
+  name: string | null;
+  email: string;
+  username: string | null;
 };
 
 export type DirectoryDto = {
