@@ -24,6 +24,7 @@ import { meRouter } from "./me/_router";
 import { oAuthRouter } from "./oAuth/_router";
 import { oooRouter } from "./ooo/_router";
 import { slotsRouter } from "./slots/_router";
+import { teamsRouter } from "./teams/_router";
 import { travelSchedulesRouter } from "./travelSchedules/_router";
 import { userAdminRouter } from "./users/_router";
 import { webhookRouter } from "./webhook/_router";
@@ -59,4 +60,5 @@ export const viewerRouter = router({
   // Implemented and already listed client-side in trpc/react/shared.ts, but never
   // registered here, so every call 404'd at runtime.
   filterSegments: filterSegmentsRouter,
+  teams: teamsRouter,
 });
