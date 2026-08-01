@@ -278,10 +278,14 @@ const EventTypeWeb = ({
   };
 
   const querySchema = z.object({
+    // .catch instead of .default: an unknown tab — a stale link, or the removed
+    // ?tabName=instant — used to throw out of useTypedQuery and blank the page.
+    // Falling back to the first tab degrades instead of breaking.
     tabName: z
       .enum(["setup", "availability", "team", "limits", "advanced", "recurring", "apps", "webhooks"])
       .optional()
-      .default("setup"),
+      .default("setup")
+      .catch("setup"),
   });
 
   const {
