@@ -1,45 +1,50 @@
 "use client";
 
+import AssignAllTeamMembers from "@calcom/features/eventtypes/components/AssignAllTeamMembers";
+import type { CheckedSelectOption } from "@calcom/features/eventtypes/components/CheckedTeamSelect";
+import { CheckedTeamSelect } from "@calcom/features/eventtypes/components/CheckedTeamSelect";
 import type { EventTypeSetupProps, FormValues, Host } from "@calcom/features/eventtypes/lib/types";
-
-/** Derived from the tab map's own prop so the two can never drift apart. */
-type TeamMemberItem = EventTypeSetupProps["teamMembers"][number];
-
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { SchedulingType } from "@calcom/prisma/enums";
-import classNames from "@calcom/ui/classNames";
+import { SettingsToggle } from "@calcom/ui/components/form";
+import { useState } from "react";
 import { useFormContext } from "react-hook-form";
 
 const DEFAULT_PRIORITY = 2;
 const DEFAULT_WEIGHT = 100;
-const PRIORITIES = [0, 1, 2, 3, 4];
 
-const buildHost = (userId: number, isCollective: boolean): Host => ({
-  userId,
-  // COLLECTIVE books every host at once, so none of them rotate.
-  isFixed: isCollective,
-  priority: DEFAULT_PRIORITY,
-  weight: DEFAULT_WEIGHT,
-  groupId: null,
+type TeamMemberItem = EventTypeSetupProps["teamMembers"][number];
+
+const toHost = (option: CheckedSelectOption, isCollective: boolean): Host => ({
+  userId: Number(option.value),
+  // COLLECTIVE books the whole team at once, so nobody rotates.
+  isFixed: isCollective ? true : (option.isFixed ?? false),
+  priority: option.priority ?? DEFAULT_PRIORITY,
+  weight: option.weight ?? DEFAULT_WEIGHT,
+  groupId: option.groupId ?? null,
 });
 
-/**
- * orgId, team and eventType come from the tab map but are not needed here: the
- * hosts live in the shared form, and the members arrive already resolved.
- */
-export const EventTeamAssignmentTab = ({
-  teamMembers,
-}: {
-  teamMembers: TeamMemberItem[];
-  orgId?: number | null;
-  team?: unknown;
-  eventType?: unknown;
-}) => {
+const toOption = (member: TeamMemberItem, host?: Host): CheckedSelectOption => ({
+  value: String(member.id),
+  label: member.name ?? member.username ?? member.email,
+  avatar: member.avatar,
+  defaultScheduleId: member.defaultScheduleId,
+  isFixed: host?.isFixed,
+  priority: host?.priority,
+  weight: host?.weight,
+  groupId: host?.groupId ?? null,
+});
+
+export const EventTeamAssignmentTab = ({ teamMembers }: { teamMembers: TeamMemberItem[] }) => {
   const { t } = useLocale();
   const formMethods = useFormContext<FormValues>();
 
   const schedulingType = formMethods.watch("schedulingType");
   const hosts = formMethods.watch("hosts") ?? [];
+  const isRRWeightsEnabled = formMethods.watch("isRRWeightsEnabled") ?? false;
+  const [assignAllTeamMembers, setAssignAllTeamMembers] = useState(
+    formMethods.getValues("assignAllTeamMembers") ?? false
+  );
 
   const isCollective = schedulingType === SchedulingType.COLLECTIVE;
   const isRoundRobin = schedulingType === SchedulingType.ROUND_ROBIN;
@@ -48,16 +53,15 @@ export const EventTeamAssignmentTab = ({
     return <p className="text-subtle text-sm">{t("managed_event_description")}</p>;
   }
 
+  const memberById = new Map(teamMembers.map((member) => [member.id, member]));
+  const options = teamMembers.map((member) => toOption(member));
+  const value = hosts.flatMap((host) => {
+    const member = memberById.get(host.userId);
+    return member ? [toOption(member, host)] : [];
+  });
+
   const setHosts = (next: Host[]) =>
     formMethods.setValue("hosts", next, { shouldDirty: true, shouldValidate: true });
-
-  const toggleHost = (userId: number, checked: boolean) =>
-    setHosts(
-      checked ? [...hosts, buildHost(userId, isCollective)] : hosts.filter((host) => host.userId !== userId)
-    );
-
-  const patchHost = (userId: number, patch: Partial<Host>) =>
-    setHosts(hosts.map((host) => (host.userId === userId ? { ...host, ...patch } : host)));
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,75 +72,31 @@ export const EventTeamAssignmentTab = ({
         </p>
       </div>
 
-      {teamMembers.length === 0 ? (
-        <p className="text-subtle text-sm">{t("no_results")}</p>
-      ) : (
-        <ul className="divide-subtle border-subtle divide-y rounded-lg border">
-          {teamMembers.map((member) => {
-            const userId = member.id;
-            const host = hosts.find((candidate) => candidate.userId === userId);
+      <AssignAllTeamMembers
+        assignAllTeamMembers={assignAllTeamMembers}
+        setAssignAllTeamMembers={setAssignAllTeamMembers}
+        onActive={() => setHosts(teamMembers.map((member) => toHost(toOption(member), isCollective)))}
+        onInactive={() => setHosts([])}
+      />
 
-            return (
-              <li key={member.id} className="flex flex-wrap items-center gap-3 p-3">
-                <label className="flex min-w-56 flex-1 items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(host)}
-                    onChange={(event) => toggleHost(userId, event.target.checked)}
-                  />
-                  <span className="text-emphasis text-sm font-medium">
-                    {member.name ?? member.username ?? member.email}
-                  </span>
-                  <span className="text-subtle text-sm">{member.email}</span>
-                </label>
+      {isRoundRobin && (
+        <SettingsToggle
+          title={t("enable_weights")}
+          checked={isRRWeightsEnabled}
+          onCheckedChange={(active) =>
+            formMethods.setValue("isRRWeightsEnabled", active, { shouldDirty: true })
+          }
+        />
+      )}
 
-                {host && isRoundRobin && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={host.isFixed}
-                        onChange={(event) => patchHost(userId, { isFixed: event.target.checked })}
-                      />
-                      {/* A fixed host is on every booking; the rest take turns. */}
-                      <span className="text-subtle text-sm">{t("fixed_host")}</span>
-                    </label>
-
-                    <label className="flex items-center gap-2">
-                      <span className="text-subtle text-sm">{t("priority")}</span>
-                      <select
-                        className="border-default bg-default text-emphasis rounded-md border px-2 py-1 text-sm"
-                        value={host.priority}
-                        disabled={host.isFixed}
-                        onChange={(event) => patchHost(userId, { priority: Number(event.target.value) })}>
-                        {PRIORITIES.map((priority) => (
-                          <option key={priority} value={priority}>
-                            {priority}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <label className="flex items-center gap-2">
-                      <span className="text-subtle text-sm">{t("weight")}</span>
-                      <input
-                        type="number"
-                        min={0}
-                        className={classNames(
-                          "border-default bg-default text-emphasis w-20 rounded-md border px-2 py-1 text-sm",
-                          host.isFixed && "opacity-50"
-                        )}
-                        value={host.weight}
-                        disabled={host.isFixed}
-                        onChange={(event) => patchHost(userId, { weight: Number(event.target.value) })}
-                      />
-                    </label>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+      {!assignAllTeamMembers && (
+        <CheckedTeamSelect
+          isRRWeightsEnabled={isRoundRobin && isRRWeightsEnabled}
+          groupId={null}
+          options={options}
+          value={value}
+          onChange={(next) => setHosts(next.map((option) => toHost(option, isCollective)))}
+        />
       )}
     </div>
   );
