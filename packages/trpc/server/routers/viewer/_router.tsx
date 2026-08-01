@@ -16,6 +16,7 @@ import { deploymentSetupRouter } from "./deploymentSetup/_router";
 import { eventTypesRouter } from "./eventTypes/_router";
 import { eventTypesRouter as heavyEventTypesRouter } from "./eventTypes/heavy/_router";
 import { feedbackRouter } from "./feedback/_router";
+import { filterSegmentsRouter } from "./filterSegments/_router";
 import { googleWorkspaceRouter } from "./googleWorkspace/_router";
 import { holidaysRouter } from "./holidays/_router";
 import { i18nRouter } from "./i18n/_router";
@@ -55,4 +56,7 @@ export const viewerRouter = router({
   ooo: oooRouter,
   holidays: holidaysRouter,
   travelSchedules: travelSchedulesRouter,
+  // Implemented and already listed client-side in trpc/react/shared.ts, but never
+  // registered here, so every call 404'd at runtime.
+  filterSegments: filterSegmentsRouter,
 });
