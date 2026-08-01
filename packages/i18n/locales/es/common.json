@@ -4644,5 +4644,6 @@
   "or_create_new_person": "…o crear una nueva",
   "choose": "Elegir",
   "fixed_host": "Host fijo",
-  "priority": "Prioridad"
+  "priority": "Prioridad",
+  "team_created_successfully": "Equipo {{teamName}} creado correctamente"
 }
