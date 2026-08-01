@@ -4645,5 +4645,7 @@
   "choose": "Elegir",
   "fixed_host": "Host fijo",
   "priority": "Prioridad",
-  "team_created_successfully": "Equipo {{teamName}} creado correctamente"
+  "team_created_successfully": "Equipo {{teamName}} creado correctamente",
+  "delete_team_confirmation_message": "Disolver el equipo lo elimina junto con todos sus tipos de evento. No se puede deshacer.",
+  "team_deleted_successfully": "Equipo eliminado correctamente"
 }

@@ -4781,5 +4781,7 @@
   "choose": "Choose",
   "fixed_host": "Fixed host",
   "priority": "Priority",
-  "team_created_successfully": "Team {{teamName}} created successfully"
+  "team_created_successfully": "Team {{teamName}} created successfully",
+  "delete_team_confirmation_message": "Disbanding the team removes it and every team event type. This cannot be undone.",
+  "team_deleted_successfully": "Team deleted successfully"
 }
