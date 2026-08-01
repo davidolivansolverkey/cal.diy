@@ -35,7 +35,19 @@ const toOption = (member: TeamMemberItem, host?: Host): CheckedSelectOption => (
   groupId: host?.groupId ?? null,
 });
 
-export const EventTeamAssignmentTab = ({ teamMembers }: { teamMembers: TeamMemberItem[] }) => {
+/**
+ * orgId, team and eventType come from the tab map. They are unused here — hosts
+ * live in the shared form and the members arrive resolved — but they must stay
+ * on the signature or the call site fails to compile.
+ */
+export const EventTeamAssignmentTab = ({
+  teamMembers,
+}: {
+  teamMembers: TeamMemberItem[];
+  orgId?: number | null;
+  team?: unknown;
+  eventType?: unknown;
+}) => {
   const { t } = useLocale();
   const formMethods = useFormContext<FormValues>();
 
