@@ -23,7 +23,10 @@ export interface IDirectoryServiceDeps {
 export class DirectoryService {
   constructor(private deps: IDirectoryServiceDeps) {}
 
-  async createOrganization(input: CreateOrganizationInput): Promise<{ id: number; slug: string }> {
+  async createOrganization(
+    input: CreateOrganizationInput,
+    ownerUserId?: number
+  ): Promise<{ id: number; slug: string }> {
     await this.assertSlugFree(input.slug);
 
     const created = await this.deps.directoryRepo.createOrganization({
@@ -31,12 +34,16 @@ export class DirectoryService {
       slug: input.slug,
       tenantId: input.tenantId,
       autoAcceptEmailDomain: input.autoAcceptEmailDomain,
+      ownerUserId,
     });
 
     return { id: created.id, slug: input.slug };
   }
 
-  async createTeam(input: CreateTeamInput): Promise<{ id: number; slug: string; parentId?: number }> {
+  async createTeam(
+    input: CreateTeamInput,
+    ownerUserId?: number
+  ): Promise<{ id: number; slug: string; parentId?: number }> {
     await this.assertSlugFree(input.slug);
 
     let parentId: number | undefined;
@@ -58,6 +65,7 @@ export class DirectoryService {
       slug: input.slug,
       parentId,
       tenantId: input.tenantId,
+      ownerUserId,
     });
 
     return { id: created.id, slug: input.slug, parentId };

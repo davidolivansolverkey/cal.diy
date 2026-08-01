@@ -1,6 +1,6 @@
 import { DEFAULT_SCHEDULE, getAvailabilityFromSchedule } from "@calcom/lib/availability";
 import type { PrismaClient } from "@calcom/prisma";
-import { type MembershipRole, SchedulingType } from "@calcom/prisma/enums";
+import { MembershipRole, SchedulingType } from "@calcom/prisma/enums";
 import type { MembershipRoleInput } from "../Directory.types";
 
 const HOSTED_SCHEDULING_TYPES = [SchedulingType.ROUND_ROBIN, SchedulingType.COLLECTIVE];
@@ -43,11 +43,17 @@ export class DirectoryRepository {
     });
   }
 
+  /**
+   * ownerUserId gets an accepted OWNER membership. Without one the team is
+   * invisible in Event Types, which only lists teams the signed-in user belongs
+   * to, so a team created without an owner looks like it was never created.
+   */
   async createOrganization(args: {
     name: string;
     slug: string;
     tenantId?: string;
     autoAcceptEmailDomain: string;
+    ownerUserId?: number;
   }): Promise<{ id: number }> {
     return this.prismaClient.team.create({
       data: {
@@ -55,6 +61,9 @@ export class DirectoryRepository {
         slug: args.slug,
         isOrganization: true,
         metadata: args.tenantId ? { skaiTenantId: args.tenantId } : undefined,
+        ...(args.ownerUserId
+          ? { members: { create: { userId: args.ownerUserId, role: MembershipRole.OWNER, accepted: true } } }
+          : {}),
         organizationSettings: {
           create: {
             orgAutoAcceptEmail: args.autoAcceptEmailDomain,
@@ -76,6 +85,7 @@ export class DirectoryRepository {
     slug: string;
     parentId?: number;
     tenantId?: string;
+    ownerUserId?: number;
   }): Promise<{ id: number }> {
     return this.prismaClient.team.create({
       data: {
@@ -83,6 +93,9 @@ export class DirectoryRepository {
         slug: args.slug,
         parentId: args.parentId,
         metadata: args.tenantId ? { skaiTenantId: args.tenantId } : undefined,
+        ...(args.ownerUserId
+          ? { members: { create: { userId: args.ownerUserId, role: MembershipRole.OWNER, accepted: true } } }
+          : {}),
       },
       select: { id: true },
     });

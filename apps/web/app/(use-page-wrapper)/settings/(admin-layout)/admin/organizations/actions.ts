@@ -21,7 +21,7 @@ export type ActionResult = { ok: true } | { ok: false; error: string };
  * Server actions bypass layouts entirely, so the admin check cannot live in
  * (admin-layout) — it has to be re-done on every mutation.
  */
-async function assertInstanceAdmin(): Promise<void> {
+async function requireInstanceAdminId(): Promise<number> {
   const session = await getServerSession({
     req: buildLegacyRequest(await headers(), await cookies()),
   });
@@ -29,6 +29,8 @@ async function assertInstanceAdmin(): Promise<void> {
   if (session?.user?.role !== UserPermissionRole.ADMIN) {
     throw new Error("Only instance admins can manage organizations and teams");
   }
+
+  return session.user.id;
 }
 
 function optional(value: FormDataEntryValue | null): string | undefined {
@@ -36,10 +38,10 @@ function optional(value: FormDataEntryValue | null): string | undefined {
   return text === "" ? undefined : text;
 }
 
-async function run(action: () => Promise<unknown>): Promise<ActionResult> {
+async function run(action: (adminUserId: number) => Promise<unknown>): Promise<ActionResult> {
   try {
-    await assertInstanceAdmin();
-    await action();
+    const adminUserId = await requireInstanceAdminId();
+    await action(adminUserId);
     revalidatePath(PATH);
     return { ok: true };
   } catch (error) {
@@ -48,24 +50,26 @@ async function run(action: () => Promise<unknown>): Promise<ActionResult> {
 }
 
 export async function createOrganizationAction(formData: FormData): Promise<ActionResult> {
-  return run(async () => {
+  // The creator becomes OWNER: Event Types only lists teams the signed-in user
+  // belongs to, so an ownerless team would be invisible everywhere but here.
+  return run(async (adminUserId) => {
     const input = createOrganizationInputSchema.parse({
       name: formData.get("name"),
       slug: formData.get("slug"),
       autoAcceptEmailDomain: optional(formData.get("autoAcceptEmailDomain")) ?? "",
     });
-    await getDirectoryService().createOrganization(input);
+    await getDirectoryService().createOrganization(input, adminUserId);
   });
 }
 
 export async function createTeamAction(formData: FormData): Promise<ActionResult> {
-  return run(async () => {
+  return run(async (adminUserId) => {
     const input = createTeamInputSchema.parse({
       name: formData.get("name"),
       slug: formData.get("slug"),
       organizationSlug: optional(formData.get("organizationSlug")),
     });
-    await getDirectoryService().createTeam(input);
+    await getDirectoryService().createTeam(input, adminUserId);
   });
 }
 
