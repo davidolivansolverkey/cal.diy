@@ -5,6 +5,7 @@ import slugify from "@calcom/lib/slugify";
 import { MembershipRole } from "@calcom/prisma/enums";
 import type { RouterOutputs } from "@calcom/trpc/react";
 import { trpc } from "@calcom/trpc/react";
+import useMeQuery from "@calcom/trpc/react/hooks/useMeQuery";
 import { Avatar } from "@calcom/ui/components/avatar";
 import { Badge } from "@calcom/ui/components/badge";
 import { Button } from "@calcom/ui/components/button";
@@ -87,6 +88,68 @@ const CreateTeamDialog = ({ open, onOpenChange }: { open: boolean; onOpenChange:
   );
 };
 
+const PendingInvitations = () => {
+  const { t } = useLocale();
+  const utils = trpc.useUtils();
+  const { data: invitations } = trpc.viewer.teams.listInvitations.useQuery();
+
+  const refresh = async () => {
+    await utils.viewer.teams.listInvitations.invalidate();
+    await utils.viewer.teams.list.invalidate();
+  };
+
+  const acceptMutation = trpc.viewer.teams.acceptInvitation.useMutation({
+    onSuccess: refresh,
+    onError: (error) => showToast(error.message, "error"),
+  });
+
+  // Declining is a self-removal, which removeMember already allows.
+  const declineMutation = trpc.viewer.teams.removeMember.useMutation({
+    onSuccess: refresh,
+    onError: (error) => showToast(error.message, "error"),
+  });
+
+  const { data: me } = useMeQuery();
+  const isPending = acceptMutation.isPending || declineMutation.isPending;
+
+  if (!invitations?.length) return null;
+
+  return (
+    <section className="mb-6">
+      <h2 className="text-emphasis mb-2 text-sm font-semibold">{t("pending_invitations")}</h2>
+      <ul className="border-subtle bg-default divide-subtle divide-y overflow-hidden rounded-lg border">
+        {invitations.map((invitation) => (
+          <li
+            key={invitation.teamId}
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Avatar size="md" alt={invitation.name} imageSrc={invitation.logoUrl} />
+              <span className="min-w-0">
+                <span className="text-emphasis block truncate text-sm font-semibold">{invitation.name}</span>
+                <span className="text-subtle block truncate text-sm">{t(roleLabelKey[invitation.role])}</span>
+              </span>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                color="secondary"
+                disabled={isPending || !me}
+                onClick={() => me && declineMutation.mutate({ teamId: invitation.teamId, userId: me.id })}>
+                {t("reject")}
+              </Button>
+              <Button
+                disabled={isPending}
+                onClick={() => acceptMutation.mutate({ teamId: invitation.teamId })}>
+                {t("accept")}
+              </Button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
 const TeamListItem = ({ team }: { team: Team }) => {
   const { t } = useLocale();
 
@@ -128,6 +191,10 @@ export const TeamsView = () => {
   return (
     <>
       <CreateTeamDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      {/* Above the empty screen on purpose: somebody whose only teams are
+          invitations would otherwise be told they have none. */}
+      <PendingInvitations />
 
       {!teams?.length ? (
         <EmptyScreen

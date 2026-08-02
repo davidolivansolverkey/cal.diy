@@ -4649,5 +4649,9 @@
   "delete_team_confirmation_message": "Disolver el equipo lo elimina junto con todos sus tipos de evento. No se puede deshacer.",
   "team_deleted_successfully": "Equipo eliminado correctamente",
   "team_has_no_event_types": "Este equipo aún no tiene tipos de evento reservables.",
-  "you_cannot_edit_this_team": "Eres miembro de este equipo. Solo sus administradores y propietarios pueden cambiar estos ajustes."
+  "you_cannot_edit_this_team": "Eres miembro de este equipo. Solo sus administradores y propietarios pueden cambiar estos ajustes.",
+  "pending_invitations": "Invitaciones pendientes",
+  "invitation_sent": "Invitación enviada",
+  "invite_link_generated": "Enlace de invitación",
+  "invite_link_description": "Todavía no hay nadie registrado con esa dirección. Envíale este enlace para que cree su cuenta y se una al equipo."
 }

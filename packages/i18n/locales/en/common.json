@@ -4785,5 +4785,9 @@
   "delete_team_confirmation_message": "Disbanding the team removes it and every team event type. This cannot be undone.",
   "team_deleted_successfully": "Team deleted successfully",
   "team_has_no_event_types": "This team has no bookable event types yet.",
-  "you_cannot_edit_this_team": "You are a member of this team. Only its admins and owners can change these settings."
+  "you_cannot_edit_this_team": "You are a member of this team. Only its admins and owners can change these settings.",
+  "pending_invitations": "Pending invitations",
+  "invitation_sent": "Invitation sent",
+  "invite_link_generated": "Invitation link",
+  "invite_link_description": "Nobody is registered with that address yet. Send them this link so they can create their account and join the team."
 }

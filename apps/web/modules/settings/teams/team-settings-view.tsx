@@ -7,7 +7,7 @@ import { trpc } from "@calcom/trpc/react";
 import useMeQuery from "@calcom/trpc/react/hooks/useMeQuery";
 import { Badge } from "@calcom/ui/components/badge";
 import { Button } from "@calcom/ui/components/button";
-import { ConfirmationDialogContent, Dialog } from "@calcom/ui/components/dialog";
+import { ConfirmationDialogContent, Dialog, DialogContent, DialogFooter } from "@calcom/ui/components/dialog";
 import { TextAreaField, TextField } from "@calcom/ui/components/form";
 import { showToast } from "@calcom/ui/components/toast";
 import { useRouter } from "next/navigation";
@@ -25,6 +25,92 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
     {children}
   </section>
 );
+
+const InviteSection = ({
+  teamId,
+  canGrantOwner,
+  onInvited,
+}: {
+  teamId: number;
+  canGrantOwner: boolean;
+  onInvited: () => Promise<void>;
+}) => {
+  const { t } = useLocale();
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<MembershipRole>(MembershipRole.MEMBER);
+  const [signupLink, setSignupLink] = useState<string | null>(null);
+
+  const inviteMutation = trpc.viewer.teams.invite.useMutation({
+    onSuccess: async (result) => {
+      setEmail("");
+      // No SMTP is configured on this instance, so an invitee without an account
+      // gets a link to hand over rather than an email that would never arrive.
+      if (result.kind === "link") setSignupLink(result.url);
+      else showToast(t("invitation_sent"), "success");
+      await onInvited();
+    },
+    onError: (mutationError) => showToast(mutationError.message, "error"),
+  });
+
+  const roles = canGrantOwner ? ROLES : ROLES.filter((option) => option !== MembershipRole.OWNER);
+
+  return (
+    <Section title={t("add_team_member")}>
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          inviteMutation.mutate({ teamId, email: email.trim(), role });
+        }}>
+        <div className="flex-1">
+          <TextField
+            label={t("email")}
+            type="email"
+            required
+            value={email}
+            placeholder="colega@empresa.com"
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-emphasis text-sm font-medium">{t("role")}</span>
+          <select
+            className={`${selectClassName} h-9`}
+            value={role}
+            onChange={(event) => setRole(event.target.value as MembershipRole)}>
+            {roles.map((option) => (
+              <option key={option} value={option}>
+                {t(option.toLowerCase())}
+              </option>
+            ))}
+          </select>
+        </div>
+        <Button type="submit" loading={inviteMutation.isPending} disabled={!email.trim()}>
+          {t("invite")}
+        </Button>
+      </form>
+
+      <Dialog open={!!signupLink} onOpenChange={(open) => !open && setSignupLink(null)}>
+        <DialogContent title={t("invite_link_generated")} description={t("invite_link_description")}>
+          <div className="bg-muted text-emphasis break-all rounded-md p-3 text-sm">{signupLink}</div>
+          <DialogFooter showDivider>
+            <Button color="secondary" onClick={() => setSignupLink(null)}>
+              {t("close")}
+            </Button>
+            <Button
+              StartIcon="link"
+              onClick={() => {
+                if (signupLink) navigator.clipboard.writeText(signupLink);
+                showToast(t("link_copied"), "success");
+              }}>
+              {t("copy_link")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Section>
+  );
+};
 
 export const TeamSettingsView = ({ teamId }: { teamId: number }) => {
   const { t } = useLocale();
@@ -126,6 +212,8 @@ export const TeamSettingsView = ({ teamId }: { teamId: number }) => {
           )}
         </form>
       </Section>
+
+      {canManage && <InviteSection teamId={teamId} canGrantOwner={canDelete} onInvited={invalidate} />}
 
       <Section title={t("members")}>
         <ul className="divide-subtle divide-y">

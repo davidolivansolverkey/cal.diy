@@ -55,4 +55,17 @@ export const teamsRouter = router({
     await getTeamService().removeMember(input.teamId, input.userId, ctx.user.id);
     return { userId: input.userId };
   }),
+
+  invite: authedProcedure
+    .input(teamIdInput.extend({ email: z.string().email(), role: z.nativeEnum(MembershipRole) }))
+    .mutation(async ({ ctx, input }) =>
+      getTeamService().invite(input.teamId, input.email, input.role, ctx.user.id)
+    ),
+
+  listInvitations: authedProcedure.query(async ({ ctx }) => getTeamService().listInvitations(ctx.user.id)),
+
+  acceptInvitation: authedProcedure.input(teamIdInput).mutation(async ({ ctx, input }) => {
+    await getTeamService().acceptInvitation(input.teamId, ctx.user.id);
+    return { teamId: input.teamId };
+  }),
 });

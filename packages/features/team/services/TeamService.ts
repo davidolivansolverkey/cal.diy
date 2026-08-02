@@ -1,11 +1,24 @@
+import { randomBytes } from "node:crypto";
 import { ErrorWithCode } from "@calcom/lib/errors";
 import { MembershipRole } from "@calcom/prisma/enums";
-import type { TeamMemberRow, TeamRepository, TeamRow } from "../repositories/TeamRepository";
+import type { InvitationRow, TeamMemberRow, TeamRepository, TeamRow } from "../repositories/TeamRepository";
 
 const ADMIN_ROLES: MembershipRole[] = [MembershipRole.OWNER, MembershipRole.ADMIN];
+const INVITE_TOKEN_DAYS = 7;
+
+/**
+ * Someone already registered is joined straight away as a pending member and
+ * accepts from their own invitation list. Someone with no account needs a
+ * signup link instead, because the membership can only exist once the user does.
+ */
+export type InviteResult =
+  | { kind: "membership"; userId: number }
+  | { kind: "link"; url: string; expires: Date };
 
 export interface ITeamServiceDeps {
   teamRepo: TeamRepository;
+  /** Base for the signup link handed out to invitees who have no account yet. */
+  webappUrl: string;
 }
 
 /**
@@ -64,6 +77,46 @@ export class TeamService {
     await this.deps.teamRepo.delete(teamId);
   }
 
+  async listInvitations(userId: number): Promise<InvitationRow[]> {
+    return this.deps.teamRepo.findInvitationsByUserId(userId);
+  }
+
+  async acceptInvitation(teamId: number, userId: number): Promise<void> {
+    const membership = await this.deps.teamRepo.findMembership(teamId, userId);
+    if (!membership) throw ErrorWithCode.Factory.NotFound("You have no invitation to this team");
+    if (membership.accepted) return;
+
+    await this.deps.teamRepo.acceptMembership(teamId, userId);
+  }
+
+  async invite(teamId: number, email: string, role: MembershipRole, userId: number): Promise<InviteResult> {
+    await this.requireRole(teamId, userId, ADMIN_ROLES);
+    await this.requireOwnerToGrantOwner(teamId, userId, role);
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const invitedUserId = await this.deps.teamRepo.findUserIdByEmail(normalizedEmail);
+
+    if (invitedUserId) {
+      const existing = await this.deps.teamRepo.findMembership(teamId, invitedUserId);
+      if (existing) {
+        throw ErrorWithCode.Factory.BadRequest(
+          existing.accepted
+            ? `${normalizedEmail} already belongs to this team`
+            : `${normalizedEmail} has already been invited`
+        );
+      }
+
+      await this.deps.teamRepo.createMembership(teamId, invitedUserId, role);
+      return { kind: "membership", userId: invitedUserId };
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + INVITE_TOKEN_DAYS * 24 * 60 * 60 * 1000);
+    await this.deps.teamRepo.createInviteToken({ teamId, email: normalizedEmail, token, expires });
+
+    return { kind: "link", url: `${this.deps.webappUrl}/signup?token=${token}`, expires };
+  }
+
   async changeMemberRole(
     teamId: number,
     targetUserId: number,
@@ -71,6 +124,7 @@ export class TeamService {
     userId: number
   ): Promise<void> {
     await this.requireRole(teamId, userId, ADMIN_ROLES);
+    await this.requireOwnerToGrantOwner(teamId, userId, role);
     await this.requireTargetIsMember(teamId, targetUserId);
 
     // Demoting the last owner would leave the team unmanageable.
@@ -106,9 +160,23 @@ export class TeamService {
     }
   }
 
+  /**
+   * Without this an ADMIN could hand out ownership — including to themselves —
+   * which is an escalation past the only role that can disband the team.
+   */
+  private async requireOwnerToGrantOwner(
+    teamId: number,
+    userId: number,
+    role: MembershipRole
+  ): Promise<void> {
+    if (role !== MembershipRole.OWNER) return;
+    await this.requireRole(teamId, userId, [MembershipRole.OWNER]);
+  }
+
+  /** Pending members count: revoking an invitation goes through the same path as removing a member. */
   private async requireTargetIsMember(teamId: number, targetUserId: number): Promise<void> {
-    const role = await this.deps.teamRepo.findRole(teamId, targetUserId);
-    if (!role) throw ErrorWithCode.Factory.NotFound("That person does not belong to this team");
+    const membership = await this.deps.teamRepo.findMembership(teamId, targetUserId);
+    if (!membership) throw ErrorWithCode.Factory.NotFound("That person does not belong to this team");
   }
 
   private async assertNotLastOwner(teamId: number, targetUserId: number): Promise<void> {

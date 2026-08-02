@@ -34,6 +34,14 @@ export type TeamMemberRow = {
   accepted: boolean;
 };
 
+export type InvitationRow = {
+  teamId: number;
+  name: string;
+  slug: string | null;
+  logoUrl: string | null;
+  role: MembershipRole;
+};
+
 export class TeamRepository {
   constructor(private prismaClient: PrismaClient) {}
 
@@ -137,13 +145,80 @@ export class TeamRepository {
     });
   }
 
+  /** Only accepted memberships confer rights, so a pending invite reads as no role. */
   async findRole(teamId: number, userId: number): Promise<MembershipRole | null> {
-    const membership = await this.prismaClient.membership.findUnique({
+    const membership = await this.findMembership(teamId, userId);
+    return membership?.accepted ? membership.role : null;
+  }
+
+  async findMembership(
+    teamId: number,
+    userId: number
+  ): Promise<{ role: MembershipRole; accepted: boolean } | null> {
+    return this.prismaClient.membership.findUnique({
       where: { userId_teamId: { userId, teamId } },
       select: { role: true, accepted: true },
     });
+  }
 
-    return membership?.accepted ? membership.role : null;
+  async findUserIdByEmail(email: string): Promise<number | null> {
+    const user = await this.prismaClient.user.findUnique({ where: { email }, select: { id: true } });
+    return user?.id ?? null;
+  }
+
+  async findInvitationsByUserId(userId: number): Promise<InvitationRow[]> {
+    const memberships = await this.prismaClient.membership.findMany({
+      where: { userId, accepted: false },
+      select: {
+        role: true,
+        team: { select: { id: true, name: true, slug: true, logoUrl: true } },
+      },
+      orderBy: { team: { name: "asc" } },
+    });
+
+    return memberships.map((membership) => ({
+      teamId: membership.team.id,
+      name: membership.team.name,
+      slug: membership.team.slug,
+      logoUrl: membership.team.logoUrl,
+      role: membership.role,
+    }));
+  }
+
+  async createMembership(teamId: number, userId: number, role: MembershipRole): Promise<void> {
+    await this.prismaClient.membership.create({
+      data: { teamId, userId, role, accepted: false },
+      select: { id: true },
+    });
+  }
+
+  async acceptMembership(teamId: number, userId: number): Promise<void> {
+    await this.prismaClient.membership.update({
+      where: { userId_teamId: { userId, teamId } },
+      data: { accepted: true },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * The signup page reads `identifier` as the invitee's email and joins them to
+   * `teamId` once they register, so those two fields are the whole contract.
+   */
+  async createInviteToken(args: {
+    teamId: number;
+    email: string;
+    token: string;
+    expires: Date;
+  }): Promise<void> {
+    await this.prismaClient.verificationToken.create({
+      data: {
+        identifier: args.email,
+        token: args.token,
+        expires: args.expires,
+        teamId: args.teamId,
+      },
+      select: { id: true },
+    });
   }
 
   async updateMemberRole(teamId: number, userId: number, role: MembershipRole): Promise<void> {
