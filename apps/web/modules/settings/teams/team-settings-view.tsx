@@ -83,6 +83,9 @@ export const TeamSettingsView = ({ teamId }: { teamId: number }) => {
   return (
     <div className="flex flex-col gap-6">
       <Section title={t("profile")}>
+        {/* Stating the reason: greyed-out fields with no save button read as a
+            broken page rather than as a permission boundary. */}
+        {!canManage && <p className="text-subtle mb-4 text-sm">{t("you_cannot_edit_this_team")}</p>}
         <form
           className="flex flex-col gap-4"
           onSubmit={(event) => {

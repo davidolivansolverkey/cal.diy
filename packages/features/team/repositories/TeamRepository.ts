@@ -76,6 +76,38 @@ export class TeamRepository {
     return this.prismaClient.team.findFirst({ where: { slug }, select: { id: true } });
   }
 
+  /**
+   * Public profile data. Hidden event types are excluded, and a private team
+   * exposes no event types at all — the same rule getPublicEvent applies.
+   */
+  async findPublicBySlug(slug: string): Promise<{
+    name: string;
+    slug: string | null;
+    bio: string | null;
+    logoUrl: string | null;
+    isPrivate: boolean;
+    eventTypes: { id: number; title: string; slug: string; length: number; description: string | null }[];
+  } | null> {
+    const team = await this.prismaClient.team.findFirst({
+      where: { slug, isOrganization: false },
+      select: {
+        name: true,
+        slug: true,
+        bio: true,
+        logoUrl: true,
+        isPrivate: true,
+        eventTypes: {
+          where: { hidden: false, schedulingType: { not: null } },
+          select: { id: true, title: true, slug: true, length: true, description: true },
+          orderBy: { position: "desc" },
+        },
+      },
+    });
+
+    if (!team) return null;
+    return { ...team, eventTypes: team.isPrivate ? [] : team.eventTypes };
+  }
+
   /** The creator is made OWNER in the same statement, so a team is never ownerless. */
   async create(args: { name: string; slug: string; ownerUserId: number }): Promise<TeamRow> {
     return this.prismaClient.team.create({

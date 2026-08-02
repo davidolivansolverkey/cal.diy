@@ -4783,5 +4783,7 @@
   "priority": "Priority",
   "team_created_successfully": "Team {{teamName}} created successfully",
   "delete_team_confirmation_message": "Disbanding the team removes it and every team event type. This cannot be undone.",
-  "team_deleted_successfully": "Team deleted successfully"
+  "team_deleted_successfully": "Team deleted successfully",
+  "team_has_no_event_types": "This team has no bookable event types yet.",
+  "you_cannot_edit_this_team": "You are a member of this team. Only its admins and owners can change these settings."
 }

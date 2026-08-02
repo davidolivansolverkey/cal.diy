@@ -19,6 +19,11 @@ export class TeamService {
     return this.deps.teamRepo.findManyByUserId(userId);
   }
 
+  /** Unauthenticated: this feeds the public /team/[slug] profile. */
+  async getPublicProfile(slug: string) {
+    return this.deps.teamRepo.findPublicBySlug(slug);
+  }
+
   async get(teamId: number, userId: number): Promise<TeamRow & { members: TeamMemberRow[] }> {
     const team = await this.requireMembership(teamId, userId);
     const members = await this.deps.teamRepo.findMembers(teamId);
